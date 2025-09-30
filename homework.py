@@ -88,25 +88,25 @@ class ACSim:
         self.pos += dx
         return self.pos
 
+class ACKF:
+    def __init__(self, pos):
+        self.radar_pos = pos
 
-def f_radar(x, dt):
-    """ state transition function for a constant velocity
-    aircraft with state vector [x, velocity, altitude]'"""
+    def f_radar(self, x, dt):
+        """ state transition function for a constant velocity
+        aircraft with state vector [x, velocity, altitude]'"""
 
-    F = np.array([[1, dt, 0],
-                  [0,  1, 0],
-                  [0,  0, 1]], dtype=float)
-    return F @ x
+        F = np.array([[1, dt, 0],
+                    [0,  1, 0],
+                    [0,  0, 1]], dtype=float)
+        return F @ x
 
-
-def h_radar(x):
-    dx = x[0] - h_radar.radar_pos[0]
-    dy = x[2] - h_radar.radar_pos[1]
-    slant_range = math.sqrt(dx**2 + dy**2)
-    elevation_angle = math.atan2(dy, dx)
-    return [slant_range, elevation_angle]
-
-h_radar.radar_pos = (0, 0)
+    def h_radar(self, x):
+        dx = x[0] - self.radar_pos[0]
+        dy = x[2] - self.radar_pos[1]
+        slant_range = math.sqrt(dx**2 + dy**2)
+        elevation_angle = math.atan2(dy, dx)
+        return [slant_range, elevation_angle]
 
 
 dt = 3. # 12 seconds between readings
@@ -115,10 +115,10 @@ elevation_angle_std = math.radians(0.5)
 ac_pos = (0., 1000.)
 ac_vel = (100., 0.)
 radar_pos = (0., 0.)
-h_radar.radar_pos = radar_pos
+ackf = ACKF(radar_pos)
 
 points = MerweScaledSigmaPoints(n=3, alpha=.1, beta=2., kappa=0.)
-kf = UKF(3, 2, dt, fx=f_radar, hx=h_radar, points=points)
+kf = UKF(3, 2, dt, fx=ackf.f_radar, hx=ackf.h_radar, points=points)
 
 kf.Q[0:2, 0:2] = Q_discrete_white_noise(2, dt=dt, var=0.1)
 kf.Q[2,2] = 0.1

@@ -84,7 +84,17 @@ class ACSim:
         """ Compute and returns next position. Incorporates
         random variation in velocity. """
 
-        dx = self.vel*dt + (randn() * self.vel_std) * dt
+        if dt < 100.0:
+            self.vel[0] += 1.5 * dt  # simulate acceleration on runway
+            self.vel[1] += 0.0 * dt  # no lift yet
+        elif dt < 250.0:
+            self.vel[0] += 0.5 * dt  # simulate lifting off and climbing
+            self.vel[1] += 0.2 * dt
+        else:
+            self.vel[0] += 0.0 * dt  # simulate cruising speed
+            self.vel[1] += 0.0 * dt  # no climb
+
+        dx = self.vel * dt + (randn() * self.vel_std) * dt
         self.pos += dx
         return self.pos
 
@@ -130,7 +140,7 @@ kf.P = np.diag([300**2, 30**2, 150**2])
 np.random.seed(200)
 radar1 = RadarStation(pos=(0, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
 radar2 = RadarStation(pos=(3000, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
-ac = ACSim(ac_pos, (100, 0), 0.02)
+ac = ACSim(ac_pos, vel=(100, 0), vel_std=.02)
 
 time = np.arange(0, 360 + dt, dt)
 xs = []

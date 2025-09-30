@@ -128,15 +128,15 @@ kf.x = np.array([0., 90., 1100.])
 kf.P = np.diag([300**2, 30**2, 150**2])
 
 np.random.seed(200)
-pos = (0, 0)
-radar = RadarStation(pos, range_std, elevation_angle_std)
+radar1 = RadarStation(pos=(0, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
+radar2 = RadarStation(pos=(3000, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
 ac = ACSim(ac_pos, (100, 0), 0.02)
 
 time = np.arange(0, 360 + dt, dt)
 xs = []
 for _ in time:
     ac.update(dt)
-    r = radar.noisy_reading(ac.pos)
+    r = radar1.noisy_reading(ac.pos)
     kf.predict()
     kf.update([r[0], r[1]])
     xs.append(kf.x)

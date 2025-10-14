@@ -33,7 +33,7 @@ from kf_book.ukf_internal import plot_radar
 from numpy.random import randn
 from filterpy.kalman import UnscentedKalmanFilter as UKF
 from filterpy.common import Q_discrete_white_noise
-
+from random import randint
 
 # create 500,000 samples with mean 0, std 1
 # gaussian = (0., 1.)
@@ -75,27 +75,44 @@ class RadarStation:
 
 
 class ACSim:
-    def __init__(self, pos, vel, vel_std):
-        self.pos = np.asarray(pos, dtype=float)
-        self.vel = np.asarray(vel, dtype=float)
-        self.vel_std = vel_std
+    def __init__(self, initial_pos, initial_vel, initial_acc, acc_std):
+        self.pos = np.asarray(initial_pos, dtype=float)
+        self.vel = np.asarray(initial_vel, dtype=float)
+        self.acc = np.asarray(initial_acc, dtype=float)
+        self.initial_acc = initial_acc
+        self.acc_std = acc_std
 
     def update(self, dt):
         """ Compute and returns next position. Incorporates
         random variation in velocity. """
 
-        if dt < 100.0:
-            self.vel[0] += 1.5 * dt  # simulate acceleration on runway
-            self.vel[1] += 0.0 * dt  # no lift yet
-        elif dt < 250.0:
-            self.vel[0] += 0.5 * dt  # simulate lifting off and climbing
-            self.vel[1] += 0.2 * dt
-        else:
-            self.vel[0] += 0.0 * dt  # simulate cruising speed
-            self.vel[1] += 0.0 * dt  # no climb
+        MASS = 20000. # kg
+        GRAVITY = 9.81 # m/s^2
+        LIFT_COEFF = 20.0 # made up
 
-        dx = self.vel * dt + (randn() * self.vel_std) * dt
-        self.pos += dx
+        lift_force = LIFT_COEFF * self.vel[0]**2 / 2
+        gravity_force = MASS * GRAVITY
+
+        # Constant acceleration in x direction
+        self.acc[0] = self.initial_acc[0]
+
+        # Vertical acceleration proportional to lifting force
+        if lift_force > gravity_force:
+            self.acc[1] = (lift_force - gravity_force) / MASS
+
+        # Add noise to acceleration
+        r = randn()
+        print(r)
+        self.acc[0] = self.acc[0] + (r * self.acc_std)
+
+        # Update velocity
+        self.vel += self.acc * dt
+
+        # Update position
+        self.pos += self.vel * dt
+
+        print(f"pos: {self.pos}, vel: {self.vel}, acc: {self.acc}, lift: {lift_force}, gravity: {gravity_force}")
+
         return self.pos
 
 class ACKF:
@@ -138,16 +155,41 @@ kf.x = np.array([0., 90., 1100.])
 kf.P = np.diag([300**2, 30**2, 150**2])
 
 np.random.seed(200)
-radar1 = RadarStation(pos=(0, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
-radar2 = RadarStation(pos=(3000, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
-ac = ACSim(ac_pos, vel=(100, 0), vel_std=.02)
+# radar1 = RadarStation(pos=(0, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
+# radar2 = RadarStation(pos=(3000, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
+# ac = ACSim(initial_pos=(0, 0), initial_vel=(0, 0), initial_acc=(2, 0), acc_std=0.05)
 
-time = np.arange(0, 360 + dt, dt)
-xs = []
-for _ in time:
-    ac.update(dt)
-    r = radar1.noisy_reading(ac.pos)
-    kf.predict()
-    kf.update([r[0], r[1]])
-    xs.append(kf.x)
-plot_radar(xs, time)
+# time = np.arange(0, 360 + dt, dt)
+# xs = []
+# for _ in time:
+#     ac.update(dt)
+#     r = radar1.noisy_reading(ac.pos)
+#     kf.predict()
+#     kf.update([r[0], r[1]])
+#     xs.append(kf.x)
+# plot_radar(xs, time)
+
+stds = [0, 5, 5, 5, 5, 5, 5, 5, 5, 5]
+
+for i, std in enumerate(stds):
+    # Plot the ACSim position
+    ac = ACSim(initial_pos=(0, 0), initial_vel=(0, 0), initial_acc=(5, 0), acc_std=std)
+    time = np.arange(0, 60 + dt, dt)
+    positions = []
+    for _ in time:
+        pos = ac.update(dt)
+        positions.append(pos.copy())
+        print("-----")
+        print(pos)
+
+    # print(len(positions))
+    # print(positions)
+    positions = np.array(positions)
+
+    plt.plot(positions[:,0], positions[:,1], label=f'{std}')
+
+plt.xlabel('Position x')
+plt.ylabel('Position y')
+plt.legend()
+plt.title('ACSim Position Over Time')
+plt.show()

@@ -102,7 +102,7 @@ class ACSim:
 
         # Add noise to acceleration
         r = randn()
-        print(r)
+        # print(r)
         self.acc[0] = self.acc[0] + (r * self.acc_std)
 
         # Update velocity
@@ -111,85 +111,126 @@ class ACSim:
         # Update position
         self.pos += self.vel * dt
 
-        print(f"pos: {self.pos}, vel: {self.vel}, acc: {self.acc}, lift: {lift_force}, gravity: {gravity_force}")
+        # print(f"pos: {self.pos}, vel: {self.vel}, acc: {self.acc}, lift: {lift_force}, gravity: {gravity_force}")
 
         return self.pos
 
-class ACKF:
-    def __init__(self, pos):
-        self.radar_pos = pos
 
-    def f_radar(self, x, dt):
-        """ state transition function for a constant velocity
-        aircraft with state vector [x, velocity, altitude]'"""
-
-        F = np.array([[1, dt, 0],
-                    [0,  1, 0],
-                    [0,  0, 1]], dtype=float)
-        return F @ x
-
-    def h_radar(self, x):
-        dx = x[0] - self.radar_pos[0]
-        dy = x[2] - self.radar_pos[1]
-        slant_range = math.sqrt(dx**2 + dy**2)
-        elevation_angle = math.atan2(dy, dx)
-        return [slant_range, elevation_angle]
+    def get_acceleration(self, sensor_std):
+        return self.acc + randn() * sensor_std
 
 
-dt = 3. # 12 seconds between readings
+# class ACKF:
+#     def __init__(self, pos):
+#         self.radar_pos = pos
+
+#     def f_radar(self, x, dt):
+#         """ state transition function for a constant velocity
+#         aircraft with state vector [x, velocity, altitude]'"""
+
+#         F = np.array([[1, dt, 0],
+#                     [0,  1, 0],
+#                     [0,  0, 1]], dtype=float)
+#         return F @ x
+
+#     def h_radar(self, x):
+#         dx = x[0] - self.radar_pos[0]
+#         dy = x[2] - self.radar_pos[1]
+#         slant_range = math.sqrt(dx**2 + dy**2)
+#         elevation_angle = math.atan2(dy, dx)
+#         return [slant_range, elevation_angle]
+
+
+# ac_pos = (0., 1000.)
+# ac_vel = (100., 0.)
+# radar_pos = (0., 0.)
+# ackf = ACKF(radar_pos)
+
+# points = MerweScaledSigmaPoints(n=3, alpha=.1, beta=2., kappa=0.)
+# kf = UKF(3, 2, dt, fx=ackf.f_radar, hx=ackf.h_radar, points=points)
+
+# kf.Q[0:2, 0:2] = Q_discrete_white_noise(2, dt=dt, var=0.1)
+# kf.Q[2,2] = 0.1
+
+# kf.R = np.diag([range_std**2, elevation_angle_std**2])
+# kf.x = np.array([0., 90., 1100.])
+# kf.P = np.diag([300**2, 30**2, 150**2])
+
+# np.random.seed(200)
+
+def plot_radar_readings(radar_readings, time):
+    ranges1 = [r[0][0] for r in radar_readings]
+    angles1 = [r[0][1] for r in radar_readings]
+
+    ranges2 = [r[1][0] for r in radar_readings]
+    angles2 = [r[1][1] for r in radar_readings]
+
+    plt.figure(figsize=(10,5))
+
+    plt.subplot(1,2,1)
+    plt.plot(time, ranges1, label='Radar 1 Range')
+    plt.plot(time, ranges2, label='Radar 2 Range')
+    plt.xlabel('Time Step')
+    plt.ylabel('Range (m)')
+    plt.title('Radar Ranges Over Time')
+    plt.legend()
+
+    plt.subplot(1,2,2)
+    plt.plot(time, np.degrees(angles1), label='Radar 1 Elevation Angle')
+    plt.plot(time, np.degrees(angles2), label='Radar 2 Elevation Angle')
+    plt.xlabel('Time Step')
+    plt.ylabel('Elevation Angle (degrees)')
+    plt.title('Radar Elevation Angles Over Time')
+    plt.legend()
+
+    plt.tight_layout()
+
+
+# stds = [0, 5, 5, 5, 5, 5, 5, 5, 5, 5]
+
+def plot_acsim_position(positions, radar1_pos, radar2_pos):
+    plt.figure(figsize=(10,5))
+    for idx, pos_list in enumerate(positions):
+        pos_list = np.array(pos_list)
+        print(pos_list.shape)
+        print(pos_list)
+        plt.plot(pos_list[:,0], pos_list[:,1], label=f'{idx}')
+
+    plt.scatter(radar1_pos[0], radar1_pos[1], c='red', marker='x', label='Radar 1')
+    plt.scatter(radar2_pos[0], radar2_pos[1], c='green', marker='x', label='Radar 2')
+    plt.xlabel('Position x')
+    plt.ylabel('Position y')
+    plt.legend()
+    plt.title('ACSim Position Over Time')
+
+
+
+dt = 1. # 12 seconds between readings
 range_std = 5 # meters
 elevation_angle_std = math.radians(0.5)
-ac_pos = (0., 1000.)
-ac_vel = (100., 0.)
-radar_pos = (0., 0.)
-ackf = ACKF(radar_pos)
 
-points = MerweScaledSigmaPoints(n=3, alpha=.1, beta=2., kappa=0.)
-kf = UKF(3, 2, dt, fx=ackf.f_radar, hx=ackf.h_radar, points=points)
+radar1 = RadarStation(pos=(-10000, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
+radar2 = RadarStation(pos=(10000, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
+ac = ACSim(initial_pos=(0, 0), initial_vel=(0, 0), initial_acc=(5, 0), acc_std=5)
 
-kf.Q[0:2, 0:2] = Q_discrete_white_noise(2, dt=dt, var=0.1)
-kf.Q[2,2] = 0.1
+time = np.arange(0, 360 + dt, dt)
+xs = []
+positions = []
+radar_readings = []
+for _ in time:
+    ac.update(dt)
+    r1_reading = radar1.noisy_reading(ac.pos)
+    r2_reading = radar2.noisy_reading(ac.pos)
+    acc_reading = ac.get_acceleration(sensor_std=0.2)
 
-kf.R = np.diag([range_std**2, elevation_angle_std**2])
-kf.x = np.array([0., 90., 1100.])
-kf.P = np.diag([300**2, 30**2, 150**2])
+    positions.append(ac.pos.copy())
+    radar_readings.append((r1_reading, r2_reading))
 
-np.random.seed(200)
-# radar1 = RadarStation(pos=(0, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
-# radar2 = RadarStation(pos=(3000, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
-# ac = ACSim(initial_pos=(0, 0), initial_vel=(0, 0), initial_acc=(2, 0), acc_std=0.05)
+    # kf.predict()
+    # kf.update([r[0], r[1]])
+    # xs.append(kf.x)
 
-# time = np.arange(0, 360 + dt, dt)
-# xs = []
-# for _ in time:
-#     ac.update(dt)
-#     r = radar1.noisy_reading(ac.pos)
-#     kf.predict()
-#     kf.update([r[0], r[1]])
-#     xs.append(kf.x)
-# plot_radar(xs, time)
-
-stds = [0, 5, 5, 5, 5, 5, 5, 5, 5, 5]
-
-for i, std in enumerate(stds):
-    # Plot the ACSim position
-    ac = ACSim(initial_pos=(0, 0), initial_vel=(0, 0), initial_acc=(5, 0), acc_std=std)
-    time = np.arange(0, 60 + dt, dt)
-    positions = []
-    for _ in time:
-        pos = ac.update(dt)
-        positions.append(pos.copy())
-        print("-----")
-        print(pos)
-
-    # print(len(positions))
-    # print(positions)
-    positions = np.array(positions)
-
-    plt.plot(positions[:,0], positions[:,1], label=f'{std}')
-
-plt.xlabel('Position x')
-plt.ylabel('Position y')
-plt.legend()
-plt.title('ACSim Position Over Time')
+plot_radar_readings(radar_readings, time)
+plot_acsim_position([positions], radar1.pos, radar2.pos)
 plt.show()
+#

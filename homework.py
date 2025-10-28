@@ -88,7 +88,7 @@ class ACSim:
 
         MASS = 20000. # kg
         GRAVITY = 9.81 # m/s^2
-        LIFT_COEFF = 20.0 # made up
+        LIFT_COEFF = 30.0 # made up
 
         lift_force = LIFT_COEFF * self.vel[0]**2 / 2
         gravity_force = MASS * GRAVITY
@@ -160,10 +160,10 @@ class ACSim:
 
 def plot_radar_readings(radar_readings, time):
     ranges1 = [r[0][0] for r in radar_readings]
-    angles1 = [r[0][1] for r in radar_readings]
+    angles1 = [np.degrees(r[0][1]) for r in radar_readings]
 
     ranges2 = [r[1][0] for r in radar_readings]
-    angles2 = [r[1][1] for r in radar_readings]
+    angles2 = [np.degrees(r[1][1]) for r in radar_readings]
 
     plt.figure(figsize=(10,5))
 
@@ -176,8 +176,8 @@ def plot_radar_readings(radar_readings, time):
     plt.legend()
 
     plt.subplot(1,2,2)
-    plt.plot(time, np.degrees(angles1), label='Radar 1 Elevation Angle')
-    plt.plot(time, np.degrees(angles2), label='Radar 2 Elevation Angle')
+    plt.plot(time, angles1, label='Radar 1 Elevation Angle')
+    plt.plot(time, angles2, label='Radar 2 Elevation Angle')
     plt.xlabel('Time Step')
     plt.ylabel('Elevation Angle (degrees)')
     plt.title('Radar Elevation Angles Over Time')
@@ -209,11 +209,11 @@ dt = 1. # 12 seconds between readings
 range_std = 5 # meters
 elevation_angle_std = math.radians(0.5)
 
-radar1 = RadarStation(pos=(-10000, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
-radar2 = RadarStation(pos=(10000, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
+radar1 = RadarStation(pos=(-1000, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
+radar2 = RadarStation(pos=(1000, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
 ac = ACSim(initial_pos=(0, 0), initial_vel=(0, 0), initial_acc=(5, 0), acc_std=5)
 
-time = np.arange(0, 360 + dt, dt)
+time = np.arange(0, 100, dt)
 xs = []
 positions = []
 radar_readings = []

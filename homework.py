@@ -35,15 +35,6 @@ from filterpy.kalman import UnscentedKalmanFilter as UKF
 from filterpy.common import Q_discrete_white_noise
 from random import randint
 
-# create 500,000 samples with mean 0, std 1
-# gaussian = (0., 1.)
-# data = normal(loc=gaussian[0], scale=gaussian[1], size=500000)
-
-# def f(x):
-#     return (np.cos(4*(x/2 + 0.7))) - 1.3*x
-
-# plot_nonlinear_func(data, f)
-
 
 
 class RadarStation:
@@ -120,43 +111,6 @@ class ACSim:
         return self.acc + randn() * sensor_std
 
 
-# class ACKF:
-#     def __init__(self, pos):
-#         self.radar_pos = pos
-
-#     def f_radar(self, x, dt):
-#         """ state transition function for a constant velocity
-#         aircraft with state vector [x, velocity, altitude]'"""
-
-#         F = np.array([[1, dt, 0],
-#                     [0,  1, 0],
-#                     [0,  0, 1]], dtype=float)
-#         return F @ x
-
-#     def h_radar(self, x):
-#         dx = x[0] - self.radar_pos[0]
-#         dy = x[2] - self.radar_pos[1]
-#         slant_range = math.sqrt(dx**2 + dy**2)
-#         elevation_angle = math.atan2(dy, dx)
-#         return [slant_range, elevation_angle]
-
-
-# ac_pos = (0., 1000.)
-# ac_vel = (100., 0.)
-# radar_pos = (0., 0.)
-# ackf = ACKF(radar_pos)
-
-# points = MerweScaledSigmaPoints(n=3, alpha=.1, beta=2., kappa=0.)
-# kf = UKF(3, 2, dt, fx=ackf.f_radar, hx=ackf.h_radar, points=points)
-
-# kf.Q[0:2, 0:2] = Q_discrete_white_noise(2, dt=dt, var=0.1)
-# kf.Q[2,2] = 0.1
-
-# kf.R = np.diag([range_std**2, elevation_angle_std**2])
-# kf.x = np.array([0., 90., 1100.])
-# kf.P = np.diag([300**2, 30**2, 150**2])
-
-# np.random.seed(200)
 
 def plot_radar_readings(radar_readings, time):
     ranges1 = [r[0][0] for r in radar_readings]
@@ -185,6 +139,26 @@ def plot_radar_readings(radar_readings, time):
 
     plt.tight_layout()
 
+def plot_filter_estimates(positions, filter_estimates, radar1_pos, radar2_pos, time):
+    plt.figure(figsize=(10,5))
+    for idx, pos_list in enumerate(positions):
+        pos_list = np.array(pos_list)
+        print(pos_list.shape)
+        print(pos_list)
+        plt.plot(pos_list[:,0], pos_list[:,1], label=f'{idx}', c='green')
+    for idx, flt_list in enumerate(filter_estimates):
+        flt_list = np.array(flt_list)
+        print(flt_list.shape)
+        print(flt_list)
+        plt.plot(flt_list[:,0], flt_list[:,1], label=f'filter {idx}', c='blue')    
+
+    plt.scatter(radar1_pos[0], radar1_pos[1], c='red', marker='x', label='Radar 1')
+    plt.scatter(radar2_pos[0], radar2_pos[1], c='green', marker='x', label='Radar 2')
+    plt.xlabel('Position x')
+    plt.ylabel('Position y')
+    plt.legend()
+    plt.title('ACSim Position Over Time')
+
 
 # stds = [0, 5, 5, 5, 5, 5, 5, 5, 5, 5]
 
@@ -204,14 +178,78 @@ def plot_acsim_position(positions, radar1_pos, radar2_pos):
     plt.title('ACSim Position Over Time')
 
 
+# from filterpy.kalman import KalmanFilter
+
+# def SecondOrderKF(R_std, Q, dt, P=100):
+#     """ Create second order Kalman filter. 
+#     Specify R and Q as floats."""
+    
+#     kf = KalmanFilter(dim_x=6, dim_z=2)
+#     kf.x = np.zeros(6)
+#     kf.P[0, 0] = P
+#     kf.P[1, 1] = 1
+#     kf.P[2, 2] = 1
+#     kf.P[3, 3] = P
+#     kf.P[4, 4] = 1
+#     kf.P[5, 5] = 1
+#     kf.R *= R_std**2
+#     kf.Q = Q_discrete_white_noise(6, dt, Q)
+#     kf.F = np.array([[1., dt, .5*dt*dt, 0,   0,        0],
+#                      [0., 1.,       dt, 0,   0,        0],
+#                      [0., 0.,       1., 0,   0,        0],
+#                      [0,  0,        0., 1., dt, .5*dt*dt],
+#                      [0,  0,        0,  0,  1.,       dt],
+#                      [0,  0,        0,  0,   0,       1.]])
+#     kf.H = np.array([[1., 0., 0., 1., 0., 0.]])
+#     return kf
+
+# kf2 = SecondOrderKF(R, 0, dt=1)
 
 dt = 1. # 12 seconds between readings
 range_std = 5 # meters
 elevation_angle_std = math.radians(0.5)
 
-radar1 = RadarStation(pos=(-1000, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
-radar2 = RadarStation(pos=(1000, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
+radar1 = RadarStation(pos=(-10000, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
+radar2 = RadarStation(pos=(10000, 0), range_std=range_std, elev_angle_std=elevation_angle_std)
 ac = ACSim(initial_pos=(0, 0), initial_vel=(0, 0), initial_acc=(5, 0), acc_std=5)
+
+def h_radar(x):
+    
+    dx = x[0] - radar1.pos[0]
+    dy = x[3] - radar1.pos[1]
+
+    slant_range = math.sqrt(dx**2 + dy**2)
+    elevation_angle = math.atan2(dy, dx)
+    return [slant_range, elevation_angle]
+
+def f_radar(x, dt):
+    """ state transition function for a constant velocity 
+    aircraft"""
+    F = np.array([[1., dt, .5*dt*dt, 0,   0,        0],
+                  [0., 1.,       dt, 0,   0,        0],
+                  [0., 0.,       1., 0,   0,        0],
+                  [0,  0,        0., 1., dt, .5*dt*dt],
+                  [0,  0,        0,  0,  1.,       dt],
+                  [0,  0,        0,  0,   0,       1.]], dtype=float)
+    return F @ x
+
+def create_UKF(R_std):
+    points = MerweScaledSigmaPoints(n=6, alpha=.1, beta=2., kappa=-1.)
+    kf = UKF(6, len(R_std), dt, fx=f_radar, hx=h_radar, points=points)
+
+    kf.Q[0:3, 0:3] = Q_discrete_white_noise(3, dt=dt, var=0.1)
+    kf.Q[3:6, 3:6] = Q_discrete_white_noise(3, dt=dt, var=0.1)
+    kf.R = np.diag(R_std)
+    kf.R = kf.R @ kf.R  # square to get variance
+    kf.x = np.array([0., 0., 0., 0., 0., 0.])
+    P_initial = 100**2
+    kf.P = np.diag([P_initial, P_initial, P_initial, P_initial, P_initial, P_initial])
+    return kf
+
+
+range_std = 5 # meters
+elevation_angle_std = math.radians(0.5)
+KF_UKF = create_UKF(R_std=[range_std, elevation_angle_std]) # TODO expand R_std to 4 measurements
 
 time = np.arange(0, 100, dt)
 xs = []
@@ -226,11 +264,15 @@ for _ in time:
     positions.append(ac.pos.copy())
     radar_readings.append((r1_reading, r2_reading))
 
-    # kf.predict()
-    # kf.update([r[0], r[1]])
-    # xs.append(kf.x)
+    # Process data from this iteation through the filter
+    KF_UKF.update(radar_readings[-1])
+    KF_UKF.predict()
+    xs.append(KF_UKF.x)
 
 plot_radar_readings(radar_readings, time)
+plot_filter_estimates(positions, xs, radar1.pos, radar2.pos, time)
 plot_acsim_position([positions], radar1.pos, radar2.pos)
 plt.show()
-#
+
+
+#data2 = filter_data(kf2, radar_readings)

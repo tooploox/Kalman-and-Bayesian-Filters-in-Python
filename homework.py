@@ -31,6 +31,7 @@ from filterpy.kalman import ExtendedKalmanFilter as EKF
 from filterpy.kalman import MerweScaledSigmaPoints
 from filterpy.common import Q_discrete_white_noise
 
+SAVE_PLOT = True
 
 # --- Simulation helper classes ---
 
@@ -138,7 +139,7 @@ def plot_radar_readings(radar_readings, time):
 # --- Simulation ---
 
 # Init simulation structures
-dt, range_std, angle_std = 1.0, 50.0, math.radians(1.0)
+dt, range_std, angle_std = 1.0, 500.0, math.radians(3.0)
 radars = [
     RadarStation(pos=(-1000, 0), range_std=range_std, elev_angle_std=angle_std),
     RadarStation(pos=(1000, 0), range_std=range_std, elev_angle_std=angle_std),
@@ -206,9 +207,10 @@ for t in time:
     ekf.update(z, H_jacobian, h_radar)
     ekf_est.append(ekf.x.copy())
 
-# Final Visuals
-plot_radar_readings(radar_readings, time)
+if SAVE_PLOT:
+    plot_radar_readings(radar_readings, time)
 
+# Final Visuals
 plt.figure(figsize=(12, 6))
 actual_pos, ukf_est, ekf_est = np.array(actual_pos), np.array(ukf_est), np.array(ekf_est)
 plt.plot(actual_pos[:, 0], actual_pos[:, 1], 'k-', label='True Path', linewidth=2)
@@ -226,4 +228,9 @@ for i, radar in enumerate(radars):
 
 plt.title("Comparison: UKF vs EKF Trajectory Tracking")
 plt.legend()
-plt.show()
+plt.xlim(0, 30_000)
+plt.ylim(0, 100_000)
+if SAVE_PLOT:
+    plt.savefig("airplane_tracking.png", dpi=300)
+else:
+    plt.show()
